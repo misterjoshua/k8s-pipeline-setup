@@ -1,5 +1,27 @@
 #!/bin/bash -e
 
+# MIT License
+#
+# Copyright (c) 2019 Joshua Kellendonk
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 BIN_DIR=${BIN_DIR:-/usr/local/bin}
 TMP_DIR=${TMP_DIR:-/tmp}
 CONTEXT_NAME=${CONTEXT_NAME:-deploy}
@@ -11,6 +33,13 @@ function die() {
 
 function log() {
   echo "$*" >&2
+}
+
+function isScriptRun() {
+  [ "$(basename $0)" = "setup.sh" ] && return 0
+  [ "$(dirname $0)" = "/dev/fd" ] && return 0
+  [ "$0" = "bash" ] && return 0
+  return 1
 }
 
 function testCommands() {
@@ -46,49 +75,49 @@ function downloadHelm() {
 
 function configureKubectl() {
   log "Configuring kubectl"
-  base64 -d <<<$KUBERNETES_CRT >k.crt
+  base64 -d <<<$K8S_CRT >k.crt
 
   KEY_DIR=${KEY_DIR:-./}
 
   # Set up credentials
-  if [ ! -z "$KUBERNETES_CLIENT_CRT" ]; then
+  if [ ! -z "$K8S_CLIENT_CRT" ]; then
     log "Setting client certificate"
     CLIENT_CERT_FILE=$KEY_DIR/c.crt
-    base64 -d <<<$KUBERNETES_CLIENT_CRT >$CLIENT_CERT_FILE
+    base64 -d <<<$K8S_CLIENT_CRT >$CLIENT_CERT_FILE
     kubectl config set-credentials $CONTEXT_NAME --embed-certs=true --client-certificate=$CLIENT_CERT_FILE
   fi
 
-  if [ ! -z "$KUBERNETES_CLIENT_KEY" ]; then
+  if [ ! -z "$K8S_CLIENT_KEY" ]; then
     log "Setting client key"
     CLIENT_KEY_FILE=$KEY_DIR/c.key
-    base64 -d <<<$KUBERNETES_CLIENT_KEY >$CLIENT_KEY_FILE
+    base64 -d <<<$K8S_CLIENT_KEY >$CLIENT_KEY_FILE
     kubectl config set-credentials $CONTEXT_NAME --embed-certs=true --client-key=$CLIENT_KEY_FILE
   fi
 
-  if [ ! -z "$KUBERNETES_USERNAME" -a ! -z "$KUBERNETES_PASSWORD" ]; then
+  if [ ! -z "$K8S_USERNAME" -a ! -z "$K8S_PASSWORD" ]; then
     log "Setting user/pass"
-    kubectl config set-credentials $CONTEXT_NAME --username="$KUBERNETES_USERNAME" --password="$KUBERNETES_PASSWORD"
+    kubectl config set-credentials $CONTEXT_NAME --username="$K8S_USERNAME" --password="$K8S_PASSWORD"
   fi
 
-  if [ ! -z "$KUBERNETES_TOKEN" ]; then
+  if [ ! -z "$K8S_TOKEN" ]; then
     log "Setting bearer token"
-    kubectl config set-credentials $CONTEXT_NAME --token=$KUBERNETES_TOKEN
+    kubectl config set-credentials $CONTEXT_NAME --token=$K8S_TOKEN
   fi
 
   # Set up the cluster
-  if [ ! -z "$KUBERNETES_CRT" ]; then
+  if [ ! -z "$K8S_CA_CRT" ]; then
     log "Setting cluster certificate authority"
     CA_CERT_FILE=$KEY_DIR/k.crt
-    base64 -d <<<$KUBERNETES_CRT >$CA_CERT_FILE
+    base64 -d <<<$K8S_CA_CRT >$CA_CERT_FILE
     kubectl config set-cluster $CONTEXT_NAME --certificate-authority=$CA_CERT_FILE
   else
     log "Setting cluster to skip tls verify. WARNING: Insecure to man-in-the-middle."
     kubectl config set-cluster $CONTEXT_NAME --insecure-skip-tls-verify
   fi
 
-  if [ ! -z "$KUBERNETES_SERVER" ]; then
+  if [ ! -z "$K8S_SERVER" ]; then
     log "Setting cluster server address"
-    kubectl config set-cluster $CONTEXT_NAME --server=$KUBERNETES_SERVER
+    kubectl config set-cluster $CONTEXT_NAME --server=$K8S_SERVER
   fi
 
   log "Creating context $CONTEXT_NAME"
@@ -100,7 +129,7 @@ function configureKubectl() {
 
 function testKubectl() {
   log "Testing configuration"
-  if [ ! -z "$KUBERNETES_CRT" ]; then
+  if [ ! -z "$K8S_CRT" ]; then
     kubectl version
   else
     kubectl version --insecure-skip-tls-verify
@@ -108,9 +137,12 @@ function testKubectl() {
 }
 
 function setup() {
-  [ -z "$KUBERNETES_SERVER" ] && die "Missing KUBERNETES_SERVER env var"
+  [ -z "$K8S_SERVER" ] && die "Missing K8S_SERVER env var"
 
   log "Setting up kubectl and helm"
+
+  [ ! -d "$BIN_DIR" ] && mkdir -p $BIN_DIR
+
   testCommands
   downloadKubectl
   downloadHelm
@@ -151,15 +183,15 @@ function selftest() {
   FICTITIOUS_KEY=key
 
   log "Testing for set-context and set-cluster"
-  SIMPLE=$(KUBERNETES_SERVER=$FICTITIOUS_SERVER configureKubectl 2>/dev/null)
+  SIMPLE=$(K8S_SERVER=$FICTITIOUS_SERVER configureKubectl 2>/dev/null)
   grep "set-context" <<<$SIMPLE >/dev/null || die "Didn't set-context"
   grep "set-cluster.*--server=$FICTITIOUS_SERVER" <<<$SIMPLE >/dev/null || die "Didn't set-cluster"
 
   log "Testing basic authentication"
   USERPASS=$(
-    KUBERNETES_USERNAME=someuser
-    KUBERNETES_PASSWORD=somepassword
-    KUBERNETES_SERVER=$FICTITIOUS_SERVER
+    K8S_USERNAME=someuser
+    K8S_PASSWORD=somepassword
+    K8S_SERVER=$FICTITIOUS_SERVER
     configureKubectl 2>/dev/null)
   grep "set-credentials.*--username=someuser" <<<$USERPASS >/dev/null || die "Didn't set username"
   grep "set-credentials.*--password=somepass" <<<$USERPASS >/dev/null || die "Didn't set password"
@@ -167,16 +199,16 @@ function selftest() {
 
   log "Testing bearer token authentication"
   TOKEN=$(
-    KUBERNETES_TOKEN=abcd
-    KUBERNETES_SERVER=$FICTITIOUS_SERVER
+    K8S_TOKEN=abcd
+    K8S_SERVER=$FICTITIOUS_SERVER
     configureKubectl 2>/dev/null)
   grep "set-credentials.*--token=abcd" <<<$TOKEN >/dev/null || die "Didn't set token"
 
   log "Testing client certificate authentication"
   CLIENTCERT=$(
-    KUBERNETES_CLIENT_CRT=$(base64 <<<$FICTITIOUS_CERT)
-    KUBERNETES_CLIENT_KEY=$(base64 <<<$FICTITIOUS_KEY)
-    KUBERNETES_SERVER=$FICTITIOUS_SERVER
+    K8S_CLIENT_CRT=$(base64 <<<$FICTITIOUS_CERT)
+    K8S_CLIENT_KEY=$(base64 <<<$FICTITIOUS_KEY)
+    K8S_SERVER=$FICTITIOUS_SERVER
     KEY_DIR=$SELFTEST_DIR
     configureKubectl 2>/dev/null)
   grep "set-credentials.*--client-certificate=$SELFTEST_DIR/c.crt" <<<$CLIENTCERT >/dev/null || die "Didn't set client certificate"
@@ -186,16 +218,15 @@ function selftest() {
 
   log "Testing all the auth methods provided at once"
   KITCHENSINK=$(
-    KUBERNETES_USERNAME=someuser
-    KUBERNETES_PASSWORD=somepassword
-    KUBERNETES_TOKEN=abcd
-    KUBERNETES_CLIENT_CRT=$(base64 <<<$FICTITIOUS_CERT)
-    KUBERNETES_CLIENT_KEY=$(base64 <<<$FICTITIOUS_KEY)
-    KUBERNETES_SERVER=$FICTITIOUS_SERVER
+    K8S_USERNAME=someuser
+    K8S_PASSWORD=somepassword
+    K8S_TOKEN=abcd
+    K8S_CLIENT_CRT=$(base64 <<<$FICTITIOUS_CERT)
+    K8S_CLIENT_KEY=$(base64 <<<$FICTITIOUS_KEY)
+    K8S_SERVER=$FICTITIOUS_SERVER
     KEY_DIR=$SELFTEST_DIR \
     configureKubectl 2>/dev/null)
   grep "set-context" <<<$SIMPLE >/dev/null || die "Didn't set-context"
-  grep "set-credentials.*--client-certificate" <<<$KITCHENSINK >/dev/null || die "Didn't set client certificate"
   grep "set-credentials.*--username=someuser" <<<$USERPASS >/dev/null || die "Didn't set username"
   grep "set-credentials.*--password=somepass" <<<$USERPASS >/dev/null || die "Didn't set password"
   grep "set-credentials.*--token=abcd" <<<$TOKEN >/dev/null || die "Didn't set token"
@@ -206,7 +237,7 @@ function selftest() {
   log "Self test succeeded"
 }
 
-if [ "__$(basename $0)" = "__setup.sh" ]; then
+if isScriptRun; then
   case "$1" in
     selftest) selftest ;;
     *) setup
