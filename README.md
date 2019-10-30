@@ -21,11 +21,13 @@ bash <(curl https://raw.githubusercontent.com/misterjoshua/k8s-pipeline-setup/ma
 
 | Variables | Description |
 | --------- | ----------- |
-| `K8S_SERVER` (Required) | The URL to your master server. (e.g., `https://yourdomain:16443/`)
+| `K8S_SERVER` (Required) | The URL to your master server. (Example: `https://yourdomain:16443/`)
 | `K8S_USERNAME` and `K8S_PASSWORD` | Enables basic authentication. Set these variables to your username and password respectively.
-| `K8S_CLIENT_CRT` and `K8S_CLIENT_KEY` | Enables client certificate authentication. Set these variables to base64 strings containing PEM format the client certificate and client key respectively.
-| `K8S_CA_CRT` | Enables tls verification. Set this variable to a base64 encoded PEM format certificate.
+| `K8S_CLIENT_CRT` and `K8S_CLIENT_KEY` | Enables client certificate authentication. Set these variables to base64 strings containing the PEM format client certificate and client key respectively.
+| `K8S_CA_CRT` | Enables tls verification. Set this variable to a base64 encoded certificate for the master server's certificate authority, in PEM format.
 | `K8S_TOKEN` | Enables bearer token authentication. Set this variable to the bearer token.
+| `DOWNLOAD_KUBECTL` | Set to `no` to skip downloading helm or set to a specific version of kubectl to download that version. (Example: `v1.16.2`)
+| `DOWNLOAD_HELM` | Set to `no` to skip downloading helm or set to a specific version of helm to download that version. (Example: `v2.14.3`)
 
 ## Security Considerations
 

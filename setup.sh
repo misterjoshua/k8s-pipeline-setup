@@ -75,7 +75,8 @@ function downloadHelm() {
 
 function configureKubectl() {
   log "Configuring kubectl"
-  base64 -d <<<$K8S_CRT >k.crt
+
+  [ -z "$K8S_SERVER" ] && die "Missing K8S_SERVER env var"
 
   KEY_DIR=${KEY_DIR:-./}
 
@@ -137,41 +138,26 @@ function testKubectl() {
 }
 
 function setup() {
-  [ -z "$K8S_SERVER" ] && die "Missing K8S_SERVER env var"
-
   log "Setting up kubectl and helm"
 
   [ ! -d "$BIN_DIR" ] && mkdir -p $BIN_DIR
 
   testCommands
-  downloadKubectl
-  downloadHelm
-  configureKubectl
-  testKubectl
+
+  [ "${DOWNLOAD_KUBECTL}" != "no" ] && downloadKubectl $DOWNLOAD_KUBECTL
+  [ "${DOWNLOAD_HELM}" != "no" ] && downloadHelm $DOWNLOAD_HELM
+  [ "${CONFIGURE_KUBECTL}" != "no" ] && configureKubectl
+  [ "${TEST_KUBECTL}" != "no" ] && testKubectl
 }
 
-function selftest() {
+function selfTest() {
   log "Running self test"
 
   SELFTEST_DIR=$TMP_DIR/selftest
   rm -rf $SELFTEST_DIR
   mkdir -p $SELFTEST_DIR
 
-  log "Testing default kubectl version (stable) download"
-  BIN_DIR=$SELFTEST_DIR downloadKubectl 2>/dev/null
-  $SELFTEST_DIR/kubectl version --client | grep "^Client Version" >/dev/null || die "Didn't get kubectl 'stable'"
-
-  log "Testing arbitrary kubectl version download"
-  BIN_DIR=$SELFTEST_DIR downloadKubectl v1.16.0 2>/dev/null
-  $SELFTEST_DIR/kubectl version --client | grep "v1.16.0" >/dev/null || die "Didn't get kubectl 'v1.16.0'"
-
-  log "Testing default helm version download"
-  BIN_DIR=$SELFTEST_DIR downloadHelm 2>/dev/null
-  $SELFTEST_DIR/helm version --client | grep "^Client:" >/dev/null || die "Didn't get a helm version"
-
-  log "Testing arbitrary helm version download"
-  BIN_DIR=$SELFTEST_DIR downloadHelm v2.14.0 2>/dev/null
-  $SELFTEST_DIR/helm version --client | grep "v2.14.0" >/dev/null || die "Didn't get a helm version"
+  # Test kubectl configuration.
 
   # Create a kubectl mock.
   function kubectl() {
@@ -234,12 +220,30 @@ function selftest() {
   grep "set-credentials.*--client-key=$SELFTEST_DIR/c.key" <<<$CLIENTCERT >/dev/null || die "Didn't set client key"
   grep "set-cluster.*--server=$FICTITIOUS_SERVER" <<<$USERPASS >/dev/null || die "Didn't set server"
 
+  # Test downloading kubectl
+  log "Testing default kubectl version (stable) download"
+  BIN_DIR=$SELFTEST_DIR downloadKubectl 2>/dev/null
+  $SELFTEST_DIR/kubectl version --client | grep "^Client Version" >/dev/null || die "Didn't get kubectl 'stable'"
+
+  log "Testing arbitrary kubectl version download"
+  BIN_DIR=$SELFTEST_DIR downloadKubectl v1.16.0 2>/dev/null
+  $SELFTEST_DIR/kubectl version --client | grep "v1.16.0" >/dev/null || die "Didn't get kubectl 'v1.16.0'"
+
+  # Test downloading helm.
+  log "Testing default helm version download"
+  BIN_DIR=$SELFTEST_DIR downloadHelm 2>/dev/null
+  $SELFTEST_DIR/helm version --client | grep "^Client:" >/dev/null || die "Didn't get a helm version"
+
+  log "Testing arbitrary helm version download"
+  BIN_DIR=$SELFTEST_DIR downloadHelm v2.14.0 2>/dev/null
+  $SELFTEST_DIR/helm version --client | grep "v2.14.0" >/dev/null || die "Didn't get a helm version"
+
   log "Self test succeeded"
 }
 
 if isScriptRun; then
   case "$1" in
-    selftest) selftest ;;
+    selftest) selfTest ;;
     *) setup
   esac
 fi
