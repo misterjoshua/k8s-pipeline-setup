@@ -29,6 +29,10 @@ bash <(curl https://raw.githubusercontent.com/misterjoshua/k8s-pipeline-setup/ma
 | `DOWNLOAD_KUBECTL` | Set to `no` to skip downloading helm or set to a specific version of kubectl to download that version. (Example: `v1.16.2`)
 | `DOWNLOAD_HELM` | Set to `no` to skip downloading helm or set to a specific version of helm to download that version. (Example: `v2.14.3`)
 
+## Self Testing
+
+This script can self-test. Run `setup.sh selftest` to have the script test itself in your pipeline.
+
 ## Security Considerations
 
 Given that this script handles credentials to access your kubernetes cluster, I encourage all responsible users to review the source and to cache a copy of the script in their own repository.
