@@ -2,7 +2,7 @@
 
 # Helm Pipeline Setup Script
 
-This script downloads `helm` and `kubectl` in a build pipeline and configures kubectl to authenticate with the master so that deployment
+This script downloads `helm` and `kubectl`, then configures kubectl to authenticate with the master, so that you can deploy to Kubernetes with less boilerplate in your pipeline step.
 
 ## Basic Usage
 
