@@ -9,10 +9,20 @@ This script downloads `helm` and `kubectl`, then configures kubectl to authentic
 To use this script, you would typically set a few environment variables, download the script, and then run it. This can be done inline as follows:
 
 ```
+# Download and set up kubectl and helm (use this script)
 K8S_SERVER=https://your-master/ \
 K8S_USERNAME=yourusername \
 K8S_PASSWORD=yourpassword \
 bash <(curl https://raw.githubusercontent.com/misterjoshua/k8s-pipeline-setup/master/setup.sh)
+
+# Deploy using kubectl set
+kubectl set image deployment/name containername=image:tag
+
+# Deploy using kubectl apply
+kubectl apply -f resources/
+
+# Deploy using helm upgrade
+helm upgrade --install --values values.yaml releasename chart/path
 ```
 
 > Note: If you're using a build pipeline, it may be more convenient to set environment variables at the pipeline level.
