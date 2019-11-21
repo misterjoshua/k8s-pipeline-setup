@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/misterjoshua/k8s-pipeline-setup.svg?branch=master)](https://travis-ci.org/misterjoshua/k8s-pipeline-setup)
 
-# Helm Pipeline Setup Script
+# Kubernetes Pipeline Setup Script
 
 This script downloads `helm` and `kubectl`, then configures kubectl to authenticate with the master, so that you can deploy to Kubernetes with less boilerplate in your pipeline step.
 
