@@ -74,6 +74,8 @@ function downloadHelm() {
 }
 
 function configureKubectlFromConfigVars() {
+  log "Configuring kubectl from config environment variables"
+
   [ -z "$K8S_SERVER" ] && die "Missing K8S_SERVER env var"
 
   KEY_DIR=${KEY_DIR:-./}
@@ -127,6 +129,8 @@ function configureKubectlFromConfigVars() {
 }
 
 function configureKubectlFromConfigString {
+  log "Configuring kubectl from a config string"
+
   mkdir -p ~/.kube
   base64 -d <<<"$K8S_CONFIG" >~/.kube/config
 }
