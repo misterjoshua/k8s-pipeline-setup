@@ -73,9 +73,7 @@ function downloadHelm() {
   $BIN_DIR/helm version --client >/dev/null
 }
 
-function configureKubectl() {
-  log "Configuring kubectl"
-
+function configureKubectlFromConfigVars() {
   [ -z "$K8S_SERVER" ] && die "Missing K8S_SERVER env var"
 
   KEY_DIR=${KEY_DIR:-./}
@@ -126,6 +124,21 @@ function configureKubectl() {
 
   log "Using the context"
   kubectl config use-context $CONTEXT_NAME
+}
+
+function configureKubectlFromConfigString {
+  mkdir -p ~/.kube
+  base64 -d <<<"$K8S_CONFIG" >~/.kube/config
+}
+
+function configureKubectl() {
+  log "Configuring kubectl"
+
+  if [ ! -z "$K8S_CONFIG" ]; then
+    configureKubectlFromConfigString
+  else
+    configureKubectlFromConfigVars
+  fi
 }
 
 function testKubectl() {
